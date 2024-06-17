@@ -1,162 +1,98 @@
-import 'package:flutter/material.dart';
 import 'package:awesome_notifications/awesome_notifications.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
+import 'package:flutter/material.dart';
 class HomeScreen extends StatefulWidget {
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  TextEditingController _titleController = TextEditingController();
-  TextEditingController _timeController = TextEditingController();
-  List<Map<String, String>> schedules = [];
-
   @override
   void initState() {
     super.initState();
-    loadSchedules();
-    // Initialize Awesome Notifications
-    AwesomeNotifications().initialize(
-      'resource://drawable/ic_launcher',
-      [
-        NotificationChannel(
-          channelKey: 'basic_channel',
-          channelName: 'Basic Notifications',
-          channelDescription: 'Notification channel for basic notifications',
-          defaultColor: Color(0xFF9D50DD),
-          ledColor: Colors.white,
-        ),
-      ],
-    );
-    // Schedule notifications for existing tasks
-    scheduleAllNotifications();
+    // Delay to ensure that the widget is fully initialized
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      scheduleDailyNotifications();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Schedule Notifications'),
+        title: Text('Notifications'),
+        centerTitle: true,
+        backgroundColor: Colors.deepPurple,
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: schedules.isEmpty
-                ? Center(
-                    child: Text('No schedules added yet.'),
-                  )
-                : ListView.builder(
-                    itemCount: schedules.length,
-                    itemBuilder: (context, index) {
-                      var schedule = schedules[index];
-                      return Card(
-                        elevation: 3,
-                        margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                        child: ListTile(
-                          title: Text(schedule['title']!),
-                          subtitle: Text(schedule['time']!),
-                          trailing: IconButton(
-                            icon: Icon(Icons.delete),
-                            onPressed: () {
-                              removeSchedule(index);
-                            },
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-          Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextField(
-                  controller: _titleController,
-                  decoration: InputDecoration(
-                    labelText: 'Task Title',
-                  ),
-                ),
-                SizedBox(height: 12.0),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _timeController,
-                        decoration: InputDecoration(
-                          labelText: 'Time (HH:mm)',
-                        ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(height: 20),
+            Text(
+              'Your Daily Notifications',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Colors.deepPurple,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 20),
+            Expanded(
+              child: ListView.builder(
+                itemCount: schedules.length,
+                itemBuilder: (context, index) {
+                  return Card(
+                    elevation: 4,
+                    margin: EdgeInsets.symmetric(vertical: 8),
+                    child: ListTile(
+                      leading: Icon(
+                        Icons.notifications,
+                        color: Colors.deepPurple,
+                      ),
+                      title: Text(schedules[index]['title']),
+                      subtitle: Text(
+                        '${schedules[index]['hour'].toString().padLeft(2, '0')}:${schedules[index]['minute'].toString().padLeft(2, '0')} - ${schedules[index]['body']}',
                       ),
                     ),
-                    SizedBox(width: 12.0),
-                    ElevatedButton(
-                      onPressed: () {
-                        showTimePickerDialog();
-                      },
-                      child: Icon(Icons.access_time),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 12.0),
-                ElevatedButton(
-                  onPressed: () {
-                    addSchedule();
-                  },
-                  child: Text('Add Task'),
-                ),
-              ],
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Future<void> showTimePickerDialog() async {
-    TimeOfDay initialTime = TimeOfDay.now();
-    if (_timeController.text.isNotEmpty) {
-      List<String> parts = _timeController.text.split(':');
-      initialTime = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
-    }
+  // List of times and messages
+  final List<Map<String, dynamic>> schedules = [
+    {'hour': 7, 'minute': 0, 'title': 'Wake Up', 'body': 'Time to wake up!'},
+    {'hour': 8, 'minute': 0, 'title': 'Go to Gym', 'body': 'Time to hit the gym!'},
+    {'hour': 9, 'minute': 0, 'title': 'Breakfast', 'body': 'Don’t forget to have breakfast!'},
+    {'hour': 10, 'minute': 0, 'title': 'Meeting', 'body': 'You have a meeting now.'},
+    {'hour': 12, 'minute': 0, 'title': 'Lunch', 'body': 'Time for lunch!'},
+    {'hour': 14, 'minute': 0, 'title': 'Quick Nap', 'body': 'Take a quick nap.'},
+    {'hour': 17, 'minute': 0, 'title': 'Go to Library', 'body': 'Time to go to the library.'},
+    {'hour': 20, 'minute': 0, 'title': 'Dinner', 'body': 'Dinner time!'},
+    {'hour': 22, 'minute': 0, 'title': 'Go to Sleep', 'body': 'Time to go to sleep.'},
+  ];
 
-    TimeOfDay? pickedTime = await showTimePicker(
-      context: context,
-      initialTime: initialTime,
-    );
-
-    if (pickedTime != null) {
-      String formattedTime = '${pickedTime.hour.toString().padLeft(2, '0')}:${pickedTime.minute.toString().padLeft(2, '0')}';
-      _timeController.text = formattedTime;
-    }
-  }
-
-  void addSchedule() {
-    String title = _titleController.text;
-    String time = _timeController.text;
-
-    if (title.isNotEmpty && time.isNotEmpty) {
-      List<String> parts = time.split(':');
-      int hour = int.parse(parts[0]);
-      int minute = int.parse(parts[1]);
-
-      setState(() {
-        schedules.add({
-          'title': title,
-          'time': time,
-        });
-      });
-
-      scheduleNotification(hour, minute, title, 'Reminder: $title');
-
-      saveSchedules();
-      _titleController.clear();
-      _timeController.clear();
+  void scheduleDailyNotifications() {
+    print("Scheduling notifications...");
+    for (var schedule in schedules) {
+      print("Scheduling: ${schedule['title']} at ${schedule['hour']}:${schedule['minute']}");
+      scheduleNotification(
+        schedule['hour'],
+        schedule['minute'],
+        schedule['title'],
+        schedule['body']
+      );
     }
   }
 
-void scheduleNotification(int hour, int minute, String title, String body) {
-  try {
+  void scheduleNotification(int hour, int minute, String title, String body) {
     AwesomeNotifications().createNotification(
       content: NotificationContent(
         id: createUniqueId(),
@@ -164,70 +100,20 @@ void scheduleNotification(int hour, int minute, String title, String body) {
         title: title,
         body: body,
         notificationLayout: NotificationLayout.Default,
-        icon: 'resource://mipmap/ic_launcher',  // Using the app icon
+        icon: 'resource://mipmap/ic_launcher', // Using the default Flutter launcher icon
       ),
       schedule: NotificationCalendar(
         hour: hour,
         minute: minute,
         second: 0,
         millisecond: 0,
-        repeats: false, // Change this to true if you want it to repeat daily
+        repeats: true,
       ),
     );
-    print('Notification scheduled for $hour:$minute');
-  } catch (e) {
-    print('Error scheduling notification: $e');
-  }
-}
-
-
-  void scheduleAllNotifications() {
-    for (var schedule in schedules) {
-      List<String> parts = schedule['time']!.split(':');
-      int hour = int.parse(parts[0]);
-      int minute = int.parse(parts[1]);
-      scheduleNotification(hour, minute, schedule['title']!, 'Reminder: ${schedule['title']}');
-    }
-  }
-
-  void removeSchedule(int index) {
-    setState(() {
-      schedules.removeAt(index);
-    });
-    saveSchedules();
+    print("Notification scheduled: $title at $hour:$minute");
   }
 
   int createUniqueId() {
     return DateTime.now().millisecondsSinceEpoch.remainder(100000);
-  }
-
-  void saveSchedules() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    prefs.setStringList(
-      'schedules',
-      schedules.map((e) => '${e['title']}|${e['time']}').toList(),
-    );
-  }
-
-  void loadSchedules() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    List<String>? savedSchedules = prefs.getStringList('schedules');
-
-    if (savedSchedules != null && savedSchedules.isNotEmpty) {
-      setState(() {
-        schedules = savedSchedules.map((e) {
-          List<String> parts = e.split('|');
-          return {'title': parts[0], 'time': parts[1]};
-        }).toList();
-      });
-    }
-    
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _timeController.dispose();
-    super.dispose();
   }
 }

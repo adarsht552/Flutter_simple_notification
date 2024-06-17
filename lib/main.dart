@@ -1,10 +1,12 @@
+import 'package:awesomenotification/pages/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:awesome_notifications/awesome_notifications.dart';
-import 'package:awesomenotification/pages/home_page.dart';
 
-void main() {
-  AwesomeNotifications().initialize(
-    'resource://mipmap/ic_launcher', // Using the default Flutter launcher icon
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await AwesomeNotifications().initialize(
+    'resource://mipmap/ic_launcher',
     [
       NotificationChannel(
         channelKey: 'basic_channel',
@@ -14,13 +16,17 @@ void main() {
         ledColor: Colors.white,
         importance: NotificationImportance.High,
         playSound: true,
-        // Example of setting a custom notification sound
         enableLights: true,
         enableVibration: true,
-         // Example of setting a vibration pattern
       )
     ]
   );
+
+  bool isAllowed = await AwesomeNotifications().isNotificationAllowed();
+  if (!isAllowed) {
+    await AwesomeNotifications().requestPermissionToSendNotifications();
+  }
+
   runApp(const MyApp());
 }
 
@@ -35,3 +41,4 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
